@@ -32,7 +32,6 @@ class SelfAttention(nn.Module):
     def forward(self, x):
         bsz, seq_len, embed_dim = x.size()
 
-
         # Project Q, K, and V
         q = torch.matmul(x, self.q_proj)  # (bsz, seq_len, num_heads * head_dim)
         k = torch.matmul(x, self.k_proj)  # (bsz, seq_len, num_heads_kv * head_dim)

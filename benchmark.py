@@ -1,0 +1,231 @@
+import torch
+import time
+from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
+from typing import Dict, List, Optional
+from dataclasses import dataclass
+import os
+import torch.nn as nn
+from pathlib import Path
+
+
+@dataclass
+class ModelConfig:
+    name: str
+    hf_id: str
+
+
+SCRIPT_DIR = Path(__file__).parent
+BENCH_DIR = SCRIPT_DIR / "bench_results"
+BENCH_DIR.mkdir(exist_ok=True)
+MODELS = [
+    # Tiny/Small Models (<7B)
+    ModelConfig("TinyLlama-1.1B", "TinyLlama/TinyLlama-1.1B-Chat-v1.0"),
+    ModelConfig("Phi-2-2.8B", "microsoft/phi-2"),
+    ModelConfig("Gemma-2B", "google/gemma-2-2b-it"),
+    ModelConfig("Qwen2-0.5B", "Qwen/Qwen2-0.5B-Instruct"),
+    
+    # Llama Family
+    ModelConfig("Llama-3.2-1B", "meta-llama/Llama-3.2-1B-Instruct"),
+    ModelConfig("Llama-3.2-3B", "meta-llama/Llama-3.2-3B-Instruct"),
+    ModelConfig("Llama-3.1-8B", "meta-llama/Llama-3.1-8B-Instruct"),
+    ModelConfig("Llama-3.1-70B", "meta-llama/Llama-3.1-70B-Instruct"),
+    ModelConfig("Llama-2-7B", "meta-llama/Llama-2-7b-chat-hf"),
+    
+    # Mistral Family
+    ModelConfig("Mistral-7B", "mistralai/Mistral-7B-Instruct-v0.2"),
+    ModelConfig("Mistral-8x7B", "mistralai/Mixtral-8x7B-Instruct-v0.1"),
+    
+    # Gemma Family
+    ModelConfig("Gemma-7B", "google/gemma-2-7b-it"),
+    
+    # Qwen Family
+    ModelConfig("Qwen2-7B", "Qwen/Qwen2-7B-Instruct"),
+    ModelConfig("Qwen2-12B", "Qwen/Qwen2-12B-Instruct"),
+    ModelConfig("Qwen2-72B", "Qwen/Qwen2-72B-Instruct"),
+    
+    # Code Models (text-only, but specialized)
+    ModelConfig("CodeLlama-7B", "codellama/CodeLlama-7b-Instruct-hf"),
+    ModelConfig("StarCoder2-7B", "bigcode/starcoder2-7b"),
+    
+    # Embedding Models (also text-only)
+    ModelConfig("BGE-large", "BAAI/bge-large-en-v1.5"),
+    ModelConfig("E5-large", "intfloat/e5-large-v2"),
+]
+DEVICE = torch.device(os.getenv("DEVICE", "cpu"))
+COMPILE = os.getenv("MODEL_COMPILE", False)
+RANDOM_WEIGHTS = os.getenv("RANDOM_WEIGHTS", True)
+
+
+class SimpleLLMBenchmark:
+    def __init__(self, use_random_weights: bool = False, use_torch_compile: bool = False, model_config: ModelConfig = MODELS[0]):
+        self.use_random_weights = use_random_weights
+        self.use_torch_compile = use_torch_compile
+        self.tokenizer = self.load_tokenizer(model_config)
+        
+    def load_tokenizer(self, model_config: ModelConfig) -> nn.Module:
+        tokenizer = AutoTokenizer.from_pretrained(model_config.hf_id)
+        tokenizer.pad_token = tokenizer.eos_token
+        return tokenizer
+
+    def load_model(self, model_config: ModelConfig) -> nn.Module:
+        if self.use_random_weights:
+            print(f"Loading {model_config.name} with RANDOM weights...")
+            config = AutoConfig.from_pretrained(model_config.hf_id)
+            model = AutoModelForCausalLM.from_config(config)
+        else:
+            print(f"Loading {model_config.name} with PRETRAINED weights...")
+            model = AutoModelForCausalLM.from_pretrained(
+                model_config.hf_id,
+                torch_dtype=torch.bfloat16,
+                device_map="auto"
+            )
+        
+        if self.use_torch_compile:
+            print("Compiling model with torch.compile...")
+            model = torch.compile(model, backend='inductor')
+
+        return model.to(DEVICE)
+    
+    def generate_test_inputs(self):
+        test_texts = [
+            "Apples are red",
+            "The quick brown fox jumps over the lazy dog",
+            "Machine learning is a subset of artificial intelligence",
+            "Python is a high-level programming language",
+            "The capital of France is Paris"
+        ]
+        return [self.tokenizer(text, return_tensors="pt") for text in test_texts]
+    
+    def benchmark_inference(self, model: nn.Module, inputs: List[Dict], num_runs: int = 5):
+        ...
+        # results = []
+        
+        # for i, input_batch in enumerate(inputs):
+        #     input_batch = {k: v.to("cuda") for k, v in input_batch.items()}
+            
+        #     with torch.no_grad(): # warmup
+        #         _ = model(**input_batch)
+
+        #     torch.cuda.synchronize()
+        #     start_time = time.time()
+            
+        #     for _ in range(num_runs):
+        #         with torch.no_grad():
+        #             outputs = model(**input_batch)
+
+        #     torch.cuda.synchronize()
+        #     end_time = time.time()
+            
+        #     avg_time = (end_time - start_time) / num_runs
+        #     results.append({
+        #         "input_idx": i,
+        #         "avg_time_ms": avg_time * 1000,
+        #         "output_shape": outputs.logits.shape
+        #     })
+        
+        # return results
+    
+    def measure_memory(self, model: torch.nn.Module):
+        ...
+        # torch.cuda.empty_cache()
+        # torch.cuda.reset_peak_memory_stats()
+        
+        # dummy_input = self.tokenizer("test", return_tensors="pt").to(DEVICE)
+        # with torch.no_grad():
+        #     _ = model(**dummy_input)
+        
+        # return {
+        #     "max_memory_gb": torch.cuda.max_memory_allocated() / 1024**3,
+        #     "current_memory_gb": torch.cuda.memory_allocated() / 1024**3
+        # }
+    
+    def run_model_analysis(self, model: torch.nn.Module, model_config: ModelConfig):
+        try:
+            total_params = sum(p.numel() for p in model.parameters())
+            memory_stats = self.measure_memory(model)
+            test_inputs = self.generate_test_inputs()
+            # inference_results = self.benchmark_inference(model, test_inputs)
+            
+            print(model)
+            
+            return {
+                "model_name": model_config.name,
+                "total_params": total_params,
+                # "memory_gb": memory_stats["max_memory_gb"],
+                # "inference_times": inference_results,
+                # "summary": model_summary,
+                "weight_type": "RANDOM" if self.use_random_weights else "PRETRAINED",
+                "compiled": self.use_torch_compile
+            }
+            
+        except Exception as e:
+            return {
+                "model_name": model_config.name,
+                "error": str(e),
+                "weight_type": "RANDOM" if self.use_random_weights else "PRETRAINED"
+            }
+    
+    def run_model(self, model_config: ModelConfig):
+        print(f"\n{'='*50}")
+        print(f"Testing {model_config.name}")
+        print(f"{'='*50}")
+        try:
+            model = self.load_model(model_config)
+            model_result = self.run_model_analysis(model, model_config)
+            del model
+            torch.cuda.empty_cache()
+            
+        except Exception as e:
+            print(f"Error with {model_config.name}: {e}")
+            model_result = {
+                "model_name": model_config.name,
+                "error": str(e)
+            }
+        return model_result
+    
+    def print_results(self, result: Dict):
+        """Print formatted results"""
+        print(f"\n{'='*60}")
+        print("LLAMA MODEL BENCHMARK RESULTS")
+        print(f"{'='*60}")
+        print(f"Weight type: {'RANDOM' if self.use_random_weights else 'PRETRAINED'}")
+        print(f"Torch compile: {'ENABLED' if self.use_torch_compile else 'DISABLED'}")
+        print(f"{'='*60}")
+        
+        if "error" in result:
+            print(f"{result['model_name']}: ERROR - {result['error']}")
+            return        
+        print(f"\n{result['model_name']}:")
+        print(f"  Parameters: {result['total_params']:,}")
+        # print(f"  Memory: {result['memory_gb']:.2f} GB")
+        print(f"  Weight type: {result['weight_type']}")
+        print(f"  Compiled: {result['compiled']}")
+        
+        # print("  Inference times (ms):")
+        # for time_result in result['inference_times']:
+        #     print(f"    Input {time_result['input_idx']}: {time_result['avg_time_ms']:.2f}ms")
+
+
+
+if __name__ == "__main__":
+    for model in MODELS:
+        print(f"\n{'#'*70}")
+        print(f"CONFIG: Random={RANDOM_WEIGHTS}, Compile={COMPILE}, Device={DEVICE}")
+        print(f"{'#'*70}")
+        
+        benchmark = SimpleLLMBenchmark(
+            use_random_weights=RANDOM_WEIGHTS,
+            use_torch_compile=COMPILE,
+            model_config=model
+        )
+        
+        result = benchmark.run_model(model)
+        benchmark.print_results(result)
+        
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        filename = f"{model.name}_benchmark_{timestamp}.json"
+        import json
+        with open(BENCH_DIR / filename, 'w') as f:
+            json.dump(result, f, indent=2)
+        
+        print(f"Results saved to {filename}")
