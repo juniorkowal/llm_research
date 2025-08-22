@@ -19,40 +19,55 @@ BENCH_DIR = SCRIPT_DIR / "bench_results"
 BENCH_DIR.mkdir(exist_ok=True)
 MODELS = [
     # Tiny/Small Models (<7B)
-    ModelConfig("TinyLlama-1.1B", "TinyLlama/TinyLlama-1.1B-Chat-v1.0"),
-    ModelConfig("Phi-2-2.8B", "microsoft/phi-2"),
-    ModelConfig("Gemma-2B", "google/gemma-2-2b-it"),
-    ModelConfig("Qwen2-0.5B", "Qwen/Qwen2-0.5B-Instruct"),
+    # ModelConfig("TinyLlama-1.1B", "TinyLlama/TinyLlama-1.1B-Chat-v1.0"),
+    # ModelConfig("Phi-2-2.8B", "microsoft/phi-2"),
+    # ModelConfig("Gemma-2B", "google/gemma-2-2b-it"),
+    # ModelConfig("Qwen2-0.5B", "Qwen/Qwen2-0.5B-Instruct"),
     
-    # Llama Family
-    ModelConfig("Llama-3.2-1B", "meta-llama/Llama-3.2-1B-Instruct"),
-    ModelConfig("Llama-3.2-3B", "meta-llama/Llama-3.2-3B-Instruct"),
-    ModelConfig("Llama-3.1-8B", "meta-llama/Llama-3.1-8B-Instruct"),
-    ModelConfig("Llama-3.1-70B", "meta-llama/Llama-3.1-70B-Instruct"),
-    ModelConfig("Llama-2-7B", "meta-llama/Llama-2-7b-chat-hf"),
+    # # Llama Family
+    # ModelConfig("Llama-3.2-1B", "meta-llama/Llama-3.2-1B-Instruct"),
+    # ModelConfig("Llama-3.2-3B", "meta-llama/Llama-3.2-3B-Instruct"),
+    # ModelConfig("Llama-3.1-8B", "meta-llama/Llama-3.1-8B-Instruct"),
+    # ModelConfig("Llama-3.1-70B", "meta-llama/Llama-3.1-70B-Instruct"),
+    # ModelConfig("Llama-2-7B", "meta-llama/Llama-2-7b-chat-hf"),
     
-    # Mistral Family
-    ModelConfig("Mistral-7B", "mistralai/Mistral-7B-Instruct-v0.2"),
-    ModelConfig("Mistral-8x7B", "mistralai/Mixtral-8x7B-Instruct-v0.1"),
+    # # Mistral Family
+    # ModelConfig("Mistral-7B", "mistralai/Mistral-7B-Instruct-v0.2"),
+    # ModelConfig("Mistral-8x7B", "mistralai/Mixtral-8x7B-Instruct-v0.1"),
     
-    # Gemma Family
-    ModelConfig("Gemma-7B", "google/gemma-2-7b-it"),
+    # # Gemma Family
+    # ModelConfig("Gemma-7B", "google/gemma-2-7b-it"),
     
-    # Qwen Family
-    ModelConfig("Qwen2-7B", "Qwen/Qwen2-7B-Instruct"),
-    ModelConfig("Qwen2-12B", "Qwen/Qwen2-12B-Instruct"),
-    ModelConfig("Qwen2-72B", "Qwen/Qwen2-72B-Instruct"),
+    # # Qwen Family
+    # ModelConfig("Qwen2-7B", "Qwen/Qwen2-7B-Instruct"),
+    # ModelConfig("Qwen2-12B", "Qwen/Qwen2-12B-Instruct"),
+    # ModelConfig("Qwen2.5-32B", "Qwen/Qwen2.5-Coder-32B-Instruct"),
+    # ModelConfig("Qwen2-72B", "Qwen/Qwen2-72B-Instruct"),
+
+
+    # QWEN
+    ModelConfig("Qwen3-0.6B-Base", "Qwen/Qwen3-0.6B-Base"),
+    ModelConfig("Qwen3-4B-Base", "Qwen/Qwen3-4B-Base"),
+    ModelConfig("Qwen3-8B", "Qwen/Qwen3-8B"),
+    ModelConfig("Qwen3-14B", "Qwen/Qwen3-14B"),
+    ModelConfig("Qwen3-32B", "Qwen/Qwen3-32B"),
+
     
-    # Code Models (text-only, but specialized)
-    ModelConfig("CodeLlama-7B", "codellama/CodeLlama-7b-Instruct-hf"),
-    ModelConfig("StarCoder2-7B", "bigcode/starcoder2-7b"),
+    # # Code Models (text-only, but specialized)
+    # ModelConfig("CodeLlama-7B", "codellama/CodeLlama-7b-Instruct-hf"),
+    # ModelConfig("StarCoder2-7B", "bigcode/starcoder2-7b"),
     
-    # Embedding Models (also text-only)
-    ModelConfig("BGE-large", "BAAI/bge-large-en-v1.5"),
-    ModelConfig("E5-large", "intfloat/e5-large-v2"),
+    # # Embedding Models (also text-only)
+    # ModelConfig("BGE-large", "BAAI/bge-large-en-v1.5"),
+    # ModelConfig("E5-large", "intfloat/e5-large-v2"),
 ]
 DEVICE = torch.device(os.getenv("DEVICE", "cpu"))
-COMPILE = os.getenv("MODEL_COMPILE", False)
+
+def get_bool_env(env_var, default=False):
+    value = os.getenv(env_var, str(default))
+    return value.lower() in ('true', '1', 'yes', 'y', 't')
+
+COMPILE = get_bool_env("MODEL_COMPILE", False)
 RANDOM_WEIGHTS = os.getenv("RANDOM_WEIGHTS", True)
 
 
@@ -61,23 +76,38 @@ class SimpleLLMBenchmark:
         self.use_random_weights = use_random_weights
         self.use_torch_compile = use_torch_compile
         self.tokenizer = self.load_tokenizer(model_config)
+        self.save_dir = Path(SCRIPT_DIR) / "weights" / model_config.name.lower()
+        self.save_dir.mkdir(parents=True, exist_ok=True)
         
     def load_tokenizer(self, model_config: ModelConfig) -> nn.Module:
-        tokenizer = AutoTokenizer.from_pretrained(model_config.hf_id)
+        tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
         tokenizer.pad_token = tokenizer.eos_token
         return tokenizer
 
     def load_model(self, model_config: ModelConfig) -> nn.Module:
+        model_path = self.save_dir / "model"
         if self.use_random_weights:
-            print(f"Loading {model_config.name} with RANDOM weights...")
-            config = AutoConfig.from_pretrained(model_config.hf_id)
-            model = AutoModelForCausalLM.from_config(config)
+            model_files = list(model_path.glob("*.bin")) + list(model_path.glob("*.safetensors"))
+            has_weights = len(model_files) > 0
+            if has_weights:
+                print(f"Loading existing random weights for {model_config.name} from {model_path}")
+                model = AutoModelForCausalLM.from_pretrained(
+                    model_path,
+                    local_files_only=True,
+                    device_map=DEVICE
+                )
+            else:
+                print(f"Creating new random weights for {model_config.name} and saving to {model_path}")
+                config = AutoConfig.from_pretrained(model_config.hf_id)
+                model = AutoModelForCausalLM.from_config(config)
+                model.save_pretrained(model_path)
+                model = model.to(DEVICE)
         else:
             print(f"Loading {model_config.name} with PRETRAINED weights...")
             model = AutoModelForCausalLM.from_pretrained(
                 model_config.hf_id,
-                torch_dtype=torch.bfloat16,
-                device_map="auto"
+                # torch_dtype=torch.bfloat16,
+                device_map=DEVICE
             )
         
         if self.use_torch_compile:
@@ -97,62 +127,61 @@ class SimpleLLMBenchmark:
         return [self.tokenizer(text, return_tensors="pt") for text in test_texts]
     
     def benchmark_inference(self, model: nn.Module, inputs: List[Dict], num_runs: int = 5):
-        ...
-        # results = []
+        results = []
         
-        # for i, input_batch in enumerate(inputs):
-        #     input_batch = {k: v.to("cuda") for k, v in input_batch.items()}
+        for i, input_batch in enumerate(inputs):
+            input_batch = {k: v.to(DEVICE) for k, v in input_batch.items()}
             
-        #     with torch.no_grad(): # warmup
-        #         _ = model(**input_batch)
+            with torch.no_grad(): # warmup
+                _ = model(**input_batch)
 
-        #     torch.cuda.synchronize()
-        #     start_time = time.time()
+            # torch.npu.synchronize()
+            start_time = time.time()
             
-        #     for _ in range(num_runs):
-        #         with torch.no_grad():
-        #             outputs = model(**input_batch)
+            for _ in range(num_runs):
+                with torch.no_grad():
+                    outputs = model(**input_batch)
+                    assert not torch.isnan(outputs.logits).any(), f"Output tensor contains nans."
 
-        #     torch.cuda.synchronize()
-        #     end_time = time.time()
+            # torch.npu.synchronize()
+            end_time = time.time()
             
-        #     avg_time = (end_time - start_time) / num_runs
-        #     results.append({
-        #         "input_idx": i,
-        #         "avg_time_ms": avg_time * 1000,
-        #         "output_shape": outputs.logits.shape
-        #     })
+            avg_time = (end_time - start_time) / num_runs
+            results.append({
+                "input_idx": i,
+                "avg_time_ms": avg_time * 1000,
+                "output_shape": outputs.logits.shape
+            })
         
-        # return results
+        return results
     
     def measure_memory(self, model: torch.nn.Module):
-        ...
-        # torch.cuda.empty_cache()
-        # torch.cuda.reset_peak_memory_stats()
+        torch.npu.empty_cache()
+        torch.npu.reset_peak_memory_stats()
         
-        # dummy_input = self.tokenizer("test", return_tensors="pt").to(DEVICE)
-        # with torch.no_grad():
-        #     _ = model(**dummy_input)
+        dummy_input = self.tokenizer("test", return_tensors="pt").to(DEVICE)
+        with torch.no_grad():
+            _ = model(**dummy_input)
         
-        # return {
-        #     "max_memory_gb": torch.cuda.max_memory_allocated() / 1024**3,
-        #     "current_memory_gb": torch.cuda.memory_allocated() / 1024**3
-        # }
+        return {
+            "max_memory_gb": torch.npu.max_memory_allocated() / 1024**3,
+            "current_memory_gb": torch.npu.memory_allocated() / 1024**3
+        }
     
     def run_model_analysis(self, model: torch.nn.Module, model_config: ModelConfig):
         try:
             total_params = sum(p.numel() for p in model.parameters())
             memory_stats = self.measure_memory(model)
             test_inputs = self.generate_test_inputs()
-            # inference_results = self.benchmark_inference(model, test_inputs)
+            inference_results = self.benchmark_inference(model, test_inputs)
             
             print(model)
             
             return {
                 "model_name": model_config.name,
                 "total_params": total_params,
-                # "memory_gb": memory_stats["max_memory_gb"],
-                # "inference_times": inference_results,
+                "memory_gb": memory_stats["max_memory_gb"],
+                "inference_times": inference_results,
                 # "summary": model_summary,
                 "weight_type": "RANDOM" if self.use_random_weights else "PRETRAINED",
                 "compiled": self.use_torch_compile
@@ -173,7 +202,7 @@ class SimpleLLMBenchmark:
             model = self.load_model(model_config)
             model_result = self.run_model_analysis(model, model_config)
             del model
-            torch.cuda.empty_cache()
+            torch.npu.empty_cache()
             
         except Exception as e:
             print(f"Error with {model_config.name}: {e}")
@@ -186,7 +215,7 @@ class SimpleLLMBenchmark:
     def print_results(self, result: Dict):
         """Print formatted results"""
         print(f"\n{'='*60}")
-        print("LLAMA MODEL BENCHMARK RESULTS")
+        print("MODEL BENCHMARK RESULTS")
         print(f"{'='*60}")
         print(f"Weight type: {'RANDOM' if self.use_random_weights else 'PRETRAINED'}")
         print(f"Torch compile: {'ENABLED' if self.use_torch_compile else 'DISABLED'}")
@@ -197,13 +226,13 @@ class SimpleLLMBenchmark:
             return        
         print(f"\n{result['model_name']}:")
         print(f"  Parameters: {result['total_params']:,}")
-        # print(f"  Memory: {result['memory_gb']:.2f} GB")
+        print(f"  Memory: {result['memory_gb']:.2f} GB")
         print(f"  Weight type: {result['weight_type']}")
         print(f"  Compiled: {result['compiled']}")
         
-        # print("  Inference times (ms):")
-        # for time_result in result['inference_times']:
-        #     print(f"    Input {time_result['input_idx']}: {time_result['avg_time_ms']:.2f}ms")
+        print("  Inference times (ms):")
+        for time_result in result['inference_times']:
+            print(f"    Input {time_result['input_idx']}: {time_result['avg_time_ms']:.2f}ms")
 
 
 
