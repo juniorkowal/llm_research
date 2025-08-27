@@ -11,3 +11,4 @@ TORCHINDUCTOR_PERMUTE_FUSION=1
 
 https://dev-discuss.pytorch.org/t/how-to-turn-off-inlining-force-materialization-in-torchinductor-during-torch-compile/3198/3
 https://github.com/pytorch/pytorch/blob/bf8431ba062efa9ff0cdd5032a3ddf2e007a3216/torch/_inductor/config.py#L584-L585
+https://docs.pytorch.org/assets/pytorch2-2.pdf
