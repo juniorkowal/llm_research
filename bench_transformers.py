@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 from dataclasses import dataclass
 import os
 from pathlib import Path
+from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
 
 
 @dataclass
@@ -24,8 +25,8 @@ MODELS = [
     # ModelConfig("Llama-3.1-8B", "meta-llama/Llama-3.1-8B-Instruct"),
 
     # QWEN
-    # ModelConfig("Qwen3-0.6B-Base", "Qwen/Qwen3-0.6B-Base"),
-    ModelConfig("Qwen3-4B-Base", "Qwen/Qwen3-4B-Base"),
+    ModelConfig("Qwen3-0.6B-Base", "Qwen/Qwen3-0.6B-Base"),
+    # ModelConfig("Qwen3-4B-Base", "Qwen/Qwen3-4B-Base"),
     # ModelConfig("Qwen3-8B", "Qwen/Qwen3-8B"),
     # ModelConfig("Qwen3-14B", "Qwen/Qwen3-14B"),
     # ModelConfig("Qwen3-32B", "Qwen/Qwen3-32B"),
@@ -70,6 +71,7 @@ class SimpleLLMBenchmark:
                 print(f"Creating new random weights for {model_config.name} and saving to {model_path}")
                 config = AutoConfig.from_pretrained(model_config.hf_id)
                 model = AutoModelForCausalLM.from_config(config)
+                model: Qwen3ForCausalLM
                 model.save_pretrained(model_path)
                 model = model.to(DEVICE)
         else:
