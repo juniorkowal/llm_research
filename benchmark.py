@@ -46,11 +46,11 @@ MODELS = [
 
 
     # QWEN
-    ModelConfig("Qwen3-0.6B-Base", "Qwen/Qwen3-0.6B-Base"),
+    # ModelConfig("Qwen3-0.6B-Base", "Qwen/Qwen3-0.6B-Base"),
     ModelConfig("Qwen3-4B-Base", "Qwen/Qwen3-4B-Base"),
-    ModelConfig("Qwen3-8B", "Qwen/Qwen3-8B"),
-    ModelConfig("Qwen3-14B", "Qwen/Qwen3-14B"),
-    ModelConfig("Qwen3-32B", "Qwen/Qwen3-32B"),
+    # ModelConfig("Qwen3-8B", "Qwen/Qwen3-8B"),
+    # ModelConfig("Qwen3-14B", "Qwen/Qwen3-14B"),
+    # ModelConfig("Qwen3-32B", "Qwen/Qwen3-32B"),
 
     
     # # Code Models (text-only, but specialized)
