@@ -1,10 +1,10 @@
 import torch
+import torch.nn as nn
 import time
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoConfig
 from typing import Dict, List, Optional
 from dataclasses import dataclass
 import os
-import torch.nn as nn
 from pathlib import Path
 
 
@@ -17,33 +17,11 @@ class ModelConfig:
 SCRIPT_DIR = Path(__file__).parent
 BENCH_DIR = SCRIPT_DIR / "bench_results"
 BENCH_DIR.mkdir(exist_ok=True)
-MODELS = [
-    # Tiny/Small Models (<7B)
-    # ModelConfig("TinyLlama-1.1B", "TinyLlama/TinyLlama-1.1B-Chat-v1.0"),
-    # ModelConfig("Phi-2-2.8B", "microsoft/phi-2"),
-    # ModelConfig("Gemma-2B", "google/gemma-2-2b-it"),
-    # ModelConfig("Qwen2-0.5B", "Qwen/Qwen2-0.5B-Instruct"),
-    
-    # # Llama Family
+MODELS = [    
+    # LLAMA
     # ModelConfig("Llama-3.2-1B", "meta-llama/Llama-3.2-1B-Instruct"),
     # ModelConfig("Llama-3.2-3B", "meta-llama/Llama-3.2-3B-Instruct"),
     # ModelConfig("Llama-3.1-8B", "meta-llama/Llama-3.1-8B-Instruct"),
-    # ModelConfig("Llama-3.1-70B", "meta-llama/Llama-3.1-70B-Instruct"),
-    # ModelConfig("Llama-2-7B", "meta-llama/Llama-2-7b-chat-hf"),
-    
-    # # Mistral Family
-    # ModelConfig("Mistral-7B", "mistralai/Mistral-7B-Instruct-v0.2"),
-    # ModelConfig("Mistral-8x7B", "mistralai/Mixtral-8x7B-Instruct-v0.1"),
-    
-    # # Gemma Family
-    # ModelConfig("Gemma-7B", "google/gemma-2-7b-it"),
-    
-    # # Qwen Family
-    # ModelConfig("Qwen2-7B", "Qwen/Qwen2-7B-Instruct"),
-    # ModelConfig("Qwen2-12B", "Qwen/Qwen2-12B-Instruct"),
-    # ModelConfig("Qwen2.5-32B", "Qwen/Qwen2.5-Coder-32B-Instruct"),
-    # ModelConfig("Qwen2-72B", "Qwen/Qwen2-72B-Instruct"),
-
 
     # QWEN
     # ModelConfig("Qwen3-0.6B-Base", "Qwen/Qwen3-0.6B-Base"),
@@ -51,16 +29,8 @@ MODELS = [
     # ModelConfig("Qwen3-8B", "Qwen/Qwen3-8B"),
     # ModelConfig("Qwen3-14B", "Qwen/Qwen3-14B"),
     # ModelConfig("Qwen3-32B", "Qwen/Qwen3-32B"),
-
-    
-    # # Code Models (text-only, but specialized)
-    # ModelConfig("CodeLlama-7B", "codellama/CodeLlama-7b-Instruct-hf"),
-    # ModelConfig("StarCoder2-7B", "bigcode/starcoder2-7b"),
-    
-    # # Embedding Models (also text-only)
-    # ModelConfig("BGE-large", "BAAI/bge-large-en-v1.5"),
-    # ModelConfig("E5-large", "intfloat/e5-large-v2"),
 ]
+
 DEVICE = torch.device(os.getenv("DEVICE", "cpu"))
 
 def get_bool_env(env_var, default=False):
