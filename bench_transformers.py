@@ -38,8 +38,8 @@ def get_bool_env(env_var, default=False):
     value = os.getenv(env_var, str(default))
     return value.lower() in ('true', '1', 'yes', 'y', 't')
 
-COMPILE = get_bool_env("MODEL_COMPILE", False)
-RANDOM_WEIGHTS = os.getenv("RANDOM_WEIGHTS", True)
+COMPILE = get_bool_env("COMPILE", False)
+RANDOM_WEIGHTS = get_bool_env("RANDOM_WEIGHTS", True)
 
 
 class SimpleLLMBenchmark:
