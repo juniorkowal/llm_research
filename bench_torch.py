@@ -7,12 +7,13 @@ from safetensors import safe_open
 from safetensors.torch import save_file
 import torch.nn as nn
 import os
+import torch_npu
 
 
 SCRIPT_DIR = Path(__file__).parent
 BENCH_DIR = SCRIPT_DIR / "bench_results"
 BENCH_DIR.mkdir(exist_ok=True)
-DEVICE = torch.device(os.getenv("DEVICE", "cpu"))
+DEVICE = torch.device(os.getenv("DEVICE", "npu"))
 PREFIX = 'torch'
 
 def get_bool_env(env_var, default=False):
@@ -20,7 +21,7 @@ def get_bool_env(env_var, default=False):
     return value.lower() in ('true', '1', 'yes', 'y', 't')
 
 COMPILE = get_bool_env("COMPILE", False)
-RANDOM_WEIGHTS = os.getenv("RANDOM_WEIGHTS", True)
+RANDOM_WEIGHTS = get_bool_env("RANDOM_WEIGHTS", True)
 
 qwen_configs = {
     "qwen3_06b" : Qwen3Config(
@@ -111,6 +112,40 @@ def compile_model(model: nn.Module):
     return torch.compile(model)
 
 
+def cc():
+    experimental_config = torch_npu.profiler._ExperimentalConfig(
+                export_type=[
+                            torch_npu.profiler.ExportType.Text,
+                                    torch_npu.profiler.ExportType.Db
+                                        ],
+                    profiler_level=torch_npu.profiler.ProfilerLevel.Level1,
+                        aic_metrics=torch_npu.profiler.AiCMetrics.PipeUtilization,
+                            record_op_args=True
+                            )
+                            
+    return experimental_config
+
+
+def create_profiler(EAGER_MODE_PROF=True):
+
+    experimental_config = torch_npu.profiler._ExperimentalConfig(aic_metrics=torch_npu.profiler.AiCMetrics.PipeUtilization,
+                                                                    profiler_level=torch_npu.profiler.ProfilerLevel.Level1, 
+                                                                    record_op_args=EAGER_MODE_PROF )
+    experimental_config=cc()
+
+    prof = torch_npu.profiler.profile(
+        activities=[torch_npu.profiler.ProfilerActivity.CPU,
+                    torch_npu.profiler.ProfilerActivity.NPU],
+            record_shapes=True,#False,
+            profile_memory=True,#False,
+            with_stack=True,#False,
+            schedule=torch_npu.profiler.schedule(wait=0, warmup=1, active=1, repeat=0, skip_first=1),
+            on_trace_ready=torch_npu.profiler.tensorboard_trace_handler("./result_dir"),
+            experimental_config=experimental_config)
+
+    return prof
+
+
 if __name__ == "__main__":
     from transformers.models.qwen3.modeling_qwen3 import Qwen3ForCausalLM
 
@@ -120,14 +155,22 @@ if __name__ == "__main__":
 
     save_dir = Path(SCRIPT_DIR) / "weights" / PREFIX /"qwen3_06b" / 'model'
     save_dir.mkdir(parents=True, exist_ok=True)
-    save_random_weights(model, filename=save_dir)
+    save_random_weights(model, filename=f"{save_dir}.safetensors")
     # model.save_pretrained(model, save_directory=save_dir)
 
     print(random_input)
     summary(model, input_data = random_input)
 
-    model = model#.to('npu')
-    random_input = random_input#.to('npu')
-    # model = torch.compile(model)
-    print(model(random_input))
+    model = model.to(DEVICE)
+    random_input = random_input.to(DEVICE)
 
+    model = torch.compile(model) if COMPILE else None
+
+    for _ in range(2):
+        model(random_input)
+
+    with create_profiler() as prof:
+        for _ in range(2):
+            model(random_input)
+            prof.step()
+    # print(prof)
