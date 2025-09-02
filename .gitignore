@@ -209,3 +209,6 @@ __marimo__/
 bench_results/
 weights/
 torch_compile_debug/
+result_dir/
+msprof_out/
+kernel_meta/
