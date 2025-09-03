@@ -71,3 +71,4 @@ https://gitee.com/ascend/triton-ascend/blob/master/docs/sources/mindstudio-guide
 https://www.hiascend.com/developer/download/community/result?module=sto%2Bcann
 https://hazyresearch.stanford.edu/blog/2025-05-27-no-bubbles
 https://github.com/Emericen/tiny-qwen
+https://www.hiascend.com/document/detail/zh/canncommercial/80RC2/devaids/auxiliarydevtool/atlasprofiling_16_0011.html
